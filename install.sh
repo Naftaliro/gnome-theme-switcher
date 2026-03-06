@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 #
 # GNOME Theme Switcher — Installer
+#
+# This script is provided "as is", without warranty of any kind. Use at your own risk.
+# For full details, see the LICENSE file in the repository.
+#
+# Copyright (c) 2026 Naftali
 # Installs the TUI application to ~/.local/bin/ so it can be run from anywhere.
 #
 # Usage:
