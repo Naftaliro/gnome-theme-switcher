@@ -1,2 +1,39 @@
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE / Editor settings
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# OS-specific junk
+.DS_Store
+Thumbs.db
+desktop.ini
+*.bak
+*.tmp
+
+# Logs
+*.log
+
+# Secrets
+.env
+.env.local
+*.key
+*.pem
