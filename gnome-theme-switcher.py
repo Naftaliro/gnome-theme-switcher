@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 Naftali <https://github.com/Naftaliro>
 """
 GNOME Theme Switcher
 
@@ -28,7 +30,7 @@ SETTINGS_FILE = CONFIG_DIR / "settings.json"
 VERSION = "1.0.0"
 
 # ─── Base URL for install scripts ─────────────────────────────────────────────
-REPO_BASE = "https://raw.githubusercontent.com/Naftaliro/zorinos-gnome-themes/main"
+REPO_BASE = "https://raw.githubusercontent.com/Naftaliro/zorinos-gnome-themes/v1.0.0"
 
 # ─── Built-in Theme Definitions ──────────────────────────────────────────────
 BUILTIN_THEMES = [
