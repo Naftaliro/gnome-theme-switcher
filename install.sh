@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 Naftali <https://github.com/Naftaliro>
 #
 # GNOME Theme Switcher — Installer
 #
@@ -11,7 +13,7 @@
 # Usage:
 #   chmod +x install.sh && ./install.sh
 #   # or
-#   curl -fsSL https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/v1.0.0/install.sh | bash
 #
 
 set -euo pipefail
@@ -24,7 +26,7 @@ warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 INSTALL_DIR="${HOME}/.local/bin"
 CONFIG_DIR="${HOME}/.config/gnome-theme-switcher"
 APP_NAME="gnome-theme-switcher"
-REPO_RAW="https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/main"
+REPO_RAW="https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/v1.0.0"
 
 echo -e "${BOLD}"
 cat << 'EOF'
