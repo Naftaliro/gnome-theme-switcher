@@ -6,15 +6,21 @@
 
 ---
 
-### Legal Notice & Disclaimer
+### Legal Notice and Disclaimer
 
 **This software is provided "as is", without warranty of any kind, express or implied. Use at your own risk.**
 
 This application modifies system configuration files and desktop settings via `gsettings`. The author and contributors of this project are not responsible for any damage to your system, loss of data, or any other issues that may arise from its use. It is your responsibility to back up your data and understand the risks involved.
 
-This project is an independent, unofficial tool. It is **not affiliated with, endorsed by, or connected to** any of the upstream theme authors (such as vinceliuice, Catppuccin, etc.), GNOME, or any Linux distribution. All theme names, icons, and related materials are the intellectual property of their respective owners.
+This project is an independent, unofficial tool. It is **not affiliated with, endorsed by, or connected to** any of the upstream theme authors (such as vinceliuice, Catppuccin, yeyushengfan258, etc.), GNOME, or any Linux distribution.
 
-This project was created with the assistance of AI. For full details, see the [LICENSE](LICENSE) file.
+This project was created with the significant assistance of AI. For full details, see the [LICENSE](LICENSE) file.
+
+---
+
+### Trademarks
+
+"GNOME" is a trademark of The GNOME Foundation. "ZorinOS" is a trademark of Zorin Group. "macOS" and "Apple" are trademarks of Apple Inc. "Windows" and "Microsoft" are trademarks of Microsoft Corporation. "Ubuntu" is a trademark of Canonical Ltd. All other product names, logos, and brands are the property of their respective owners. These names are used in this project solely to describe compatibility and visual inspiration, and their use does not imply any affiliation or endorsement.
 
 ---
 
@@ -24,7 +30,7 @@ This project was created with the assistance of AI. For full details, see the [L
 |---|---|
 | **Browse Themes** | Navigate 9 built-in themes organized by category (macOS, Windows, Linux-Native) |
 | **Apply Instantly** | Switch your entire desktop (GTK, Shell, Icons, Cursors) with a single Enter keypress |
-| **Install Themes** | Download and install themes directly from the TUI via `curl` one-liners |
+| **Install Themes** | Download and install themes directly from the TUI via install scripts |
 | **Custom Themes** | Add, edit, and delete your own custom theme configurations |
 | **Backup / Restore** | Automatically backs up your current theme before switching; restore anytime |
 | **Active Detection** | Shows which theme is currently active and which are installed |
@@ -34,7 +40,7 @@ This project was created with the assistance of AI. For full details, see the [L
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  GNOME Theme Switcher v1.1.0                           Press [?] for help  │
+│  GNOME Theme Switcher v1.0.0                           Press [?] for help  │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                │                                            │
 │  Themes                        │ Details                                    │
@@ -61,8 +67,30 @@ This project was created with the assistance of AI. For full details, see the [L
 
 ## Installation
 
+### Recommended: Download, Inspect, Then Run
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/main/install.sh | bash
+# Step 1: Download the installer
+curl -fsSL https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/v1.0.0/install.sh -o gts-install.sh
+
+# Step 2: Verify the checksum (compare against SHA256SUMS.txt in this repo)
+sha256sum gts-install.sh
+
+# Step 3: Review the script
+less gts-install.sh
+
+# Step 4: Run it
+chmod +x gts-install.sh && ./gts-install.sh
+```
+
+SHA-256 checksums for all files are published in the **[SHA256SUMS.txt](SHA256SUMS.txt)** file and in each GitHub Release.
+
+### Quick Install (One-Liner)
+
+For convenience, the installer can also be run directly. **By using this method, you are trusting the code at the current HEAD of this repository.**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/v1.0.0/install.sh | bash
 ```
 
 This downloads the application to `~/.local/bin/gnome-theme-switcher` and adds it to your PATH.
@@ -79,8 +107,8 @@ gnome-theme-switcher
 
 | Key | Action |
 |---|---|
-| `↑` / `k` | Move selection up |
-| `↓` / `j` | Move selection down |
+| `Up` / `k` | Move selection up |
+| `Down` / `j` | Move selection down |
 | `Enter` | Apply the selected theme |
 | `i` | Install the selected theme (runs install script) |
 | `a` | Add a new custom theme |
@@ -90,7 +118,19 @@ gnome-theme-switcher
 | `?` | Show help screen |
 | `q` | Quit |
 
-## Upstream Themes & Credits
+## Uninstall
+
+```bash
+gnome-theme-switcher-uninstall
+```
+
+To also remove configuration files:
+
+```bash
+rm -rf ~/.config/gnome-theme-switcher/
+```
+
+## Upstream Themes and Credits
 
 This tool includes pre-configured settings for themes created by the open-source community. **All credit for the themes themselves goes to their original authors.** Please support their work.
 
@@ -98,15 +138,17 @@ This tool includes pre-configured settings for themes created by the open-source
 |---|---|---|
 | WhiteSur, Colloid, Fluent, Orchis, Graphite, Lavanda, Tela Icons | [vinceliuice](https://github.com/vinceliuice) | GPL-3.0 |
 | We10X, Win11 | [yeyushengfan258](https://github.com/yeyushengfan258) | GPL-3.0 |
-| Catppuccin | [Catppuccin](https://github.com/catppuccin) & [Fausto-Korpsvart](https://github.com/Fausto-Korpsvart) | MIT |
+| Catppuccin | [Catppuccin](https://github.com/catppuccin) and [Fausto-Korpsvart](https://github.com/Fausto-Korpsvart) | MIT / GPL-3.0 |
 
 The install scripts for these themes are maintained in the [zorinos-gnome-themes](https://github.com/Naftaliro/zorinos-gnome-themes) repository.
 
 ## Compatibility
 
-- **OS:** Ubuntu 22.04+, ZorinOS 18+, and other modern GNOME-based distros.
-- **Desktop:** GNOME 42+
-- **Python:** 3.8+
+| Field | Value |
+|---|---|
+| **OS** | Ubuntu 22.04+, ZorinOS 18+, and other modern GNOME-based distros |
+| **Desktop** | GNOME 42+ |
+| **Python** | 3.8+ |
 
 ## License
 
