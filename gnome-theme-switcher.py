@@ -1,18 +1,12 @@
 #!/usr/bin/env python3
 """
-GNOME Theme Switcher — A TUI for switching between system-wide GNOME themes.
+GNOME Theme Switcher
 
-This application provides a terminal user interface (TUI) built with Python's
-curses library (zero external dependencies) to browse, install, apply, and
-manage GNOME desktop themes. It ships with 9 pre-configured themes from the
-zorinos-gnome-themes collection and supports adding custom themes.
+This software is provided "as is", without warranty of any kind, express or implied.
+Use at your own risk. For full details, see the LICENSE file in the repository.
+This project is not affiliated with any of the upstream theme authors.
 
-Usage:
-    python3 gnome-theme-switcher.py
-    # or
-    gnome-theme-switcher   (if installed via the install script)
-
-License: MIT
+Copyright (c) 2026 Naftali
 """
 
 import curses
