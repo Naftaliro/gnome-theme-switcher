@@ -34,13 +34,15 @@ This project was created with the significant assistance of AI. For full details
 | **Custom Themes** | Add, edit, and delete your own custom theme configurations |
 | **Backup / Restore** | Automatically backs up your current theme before switching; restore anytime |
 | **Active Detection** | Shows which theme is currently active and which are installed |
-| **Zero Dependencies** | Uses only Python 3 standard library (`curses`, `json`, `subprocess`) |
+| **Auto-Update** | Checks GitHub for new versions on startup and offers one-click self-update |
+| **In-TUI Install Log** | Theme installation runs in-app with a live scrollable log — no separate terminal needed |
+| **Zero Dependencies** | Uses only Python 3 standard library (`curses`, `json`, `subprocess`, `urllib`) |
 
 ## Screenshot
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  GNOME Theme Switcher v1.2.0                           Press [?] for help  │
+│  GNOME Theme Switcher v1.3.0                           Press [?] for help  │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                │                                            │
 │  Themes                        │ Details                                    │
@@ -71,7 +73,7 @@ This project was created with the significant assistance of AI. For full details
 
 ```bash
 # Step 1: Download the installer
-curl -fsSL https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/v1.2.0/install.sh -o gts-install.sh
+curl -fsSL https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/v1.3.0/install.sh -o gts-install.sh
 
 # Step 2: Verify the checksum (compare against SHA256SUMS.txt in this repo)
 sha256sum gts-install.sh
@@ -90,7 +92,7 @@ SHA-256 checksums for all files are published in the **[SHA256SUMS.txt](SHA256SU
 For convenience, the installer can also be run directly. **By using this method, you are trusting the code at the current HEAD of this repository.**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/v1.2.0/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/v1.3.0/install.sh | bash
 ```
 
 This downloads the application to `~/.local/bin/gnome-theme-switcher` and adds it to your PATH.

@@ -37,3 +37,4 @@ desktop.ini
 .env.local
 *.key
 *.pem
+.github/
