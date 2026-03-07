@@ -1,4 +1,2 @@
-# SHA-256 Checksums for gnome-theme-switcher v1.1.0
-# Verify with: sha256sum -c SHA256SUMS.txt
-8b6bcde93f628febc637cc2e447d01f97492be88eddeca300e85d53494bb6681  install.sh
-ebcf01e263c9f994e3300486bdbda3327bb01eaf6bfcadcd7ab9c7c73cf2a4e0  gnome-theme-switcher.py
+36c8707344e6f8707b3afe92faffedf6d159e39c56a5da62b9f69a80194456c2  install.sh
+4a90790e3dcb0566eef1c6f4976df1c639aa1152f54315c005fdd921b126d5e8  gnome-theme-switcher.py
