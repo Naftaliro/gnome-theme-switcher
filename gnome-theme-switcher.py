@@ -18,6 +18,12 @@ import subprocess
 import sys
 import shutil
 import copy
+import threading
+import time
+import select
+import fcntl
+import urllib.request
+import urllib.error
 from pathlib import Path
 from datetime import datetime
 
@@ -26,11 +32,15 @@ CONFIG_DIR = Path.home() / ".config" / "gnome-theme-switcher"
 CUSTOM_THEMES_FILE = CONFIG_DIR / "custom_themes.json"
 BACKUP_FILE = CONFIG_DIR / "backup.json"
 SETTINGS_FILE = CONFIG_DIR / "settings.json"
+UPDATE_CHECK_FILE = CONFIG_DIR / "last_update_check.json"
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 
-# ─── Base URL for install scripts ─────────────────────────────────────────────
-REPO_BASE = "https://raw.githubusercontent.com/Naftaliro/zorinos-gnome-themes/v1.2.0"
+# ─── GitHub Repos ────────────────────────────────────────────────────────────
+SWITCHER_REPO = "Naftaliro/gnome-theme-switcher"
+THEMES_REPO = "Naftaliro/zorinos-gnome-themes"
+REPO_BASE = f"https://raw.githubusercontent.com/{THEMES_REPO}/v1.2.0"
+GITHUB_API = "https://api.github.com"
 
 # ─── Built-in Theme Definitions ──────────────────────────────────────────────
 BUILTIN_THEMES = [
@@ -97,8 +107,8 @@ BUILTIN_THEMES = [
     {
         "name": "Orchis Material",
         "category": "Linux-Native",
-        "gtk_theme": "Orchis-purple-Dark",
-        "shell_theme": "Orchis-purple-Dark",
+        "gtk_theme": "Orchis-Purple-Dark",
+        "shell_theme": "Orchis-Purple-Dark",
         "icon_theme": "Tela-purple-dark",
         "cursor_theme": "Graphite-dark-cursors",
         "color_scheme": "prefer-dark",
@@ -143,6 +153,87 @@ BUILTIN_THEMES = [
         "builtin": True,
     },
 ]
+
+
+# ─── Update Checking ────────────────────────────────────────────────────────
+
+def fetch_latest_release(repo):
+    """Fetch the latest release tag from GitHub API. Returns (tag, url) or (None, None)."""
+    try:
+        url = f"{GITHUB_API}/repos/{repo}/releases/latest"
+        req = urllib.request.Request(url, headers={"Accept": "application/vnd.github.v3+json", "User-Agent": "gnome-theme-switcher"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode())
+            return data.get("tag_name", None), data.get("html_url", "")
+    except Exception:
+        return None, None
+
+
+def check_for_updates():
+    """Check both repos for updates. Returns dict with update info."""
+    results = {"switcher": None, "themes": None}
+
+    sw_tag, sw_url = fetch_latest_release(SWITCHER_REPO)
+    if sw_tag and sw_tag.lstrip("v") != VERSION:
+        results["switcher"] = {"current": VERSION, "latest": sw_tag, "url": sw_url}
+
+    th_tag, th_url = fetch_latest_release(THEMES_REPO)
+    # Compare against the REPO_BASE version
+    current_themes_ver = REPO_BASE.split("/")[-1] if "/" in REPO_BASE else "unknown"
+    if th_tag and th_tag != current_themes_ver:
+        results["themes"] = {"current": current_themes_ver, "latest": th_tag, "url": th_url}
+
+    return results
+
+
+def save_update_check(results):
+    """Save update check results and timestamp."""
+    ensure_config_dir()
+    data = {
+        "timestamp": datetime.now().isoformat(),
+        "results": {
+            "switcher": results.get("switcher"),
+            "themes": results.get("themes"),
+        }
+    }
+    with open(UPDATE_CHECK_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+
+
+def should_check_updates():
+    """Return True if we haven't checked in the last 6 hours."""
+    if not UPDATE_CHECK_FILE.exists():
+        return True
+    try:
+        with open(UPDATE_CHECK_FILE, "r") as f:
+            data = json.load(f)
+        last = datetime.fromisoformat(data["timestamp"])
+        return (datetime.now() - last).total_seconds() > 21600  # 6 hours
+    except Exception:
+        return True
+
+
+def self_update():
+    """Download and replace the current script with the latest version."""
+    try:
+        tag, _ = fetch_latest_release(SWITCHER_REPO)
+        if not tag:
+            return False, "Could not determine latest version."
+        raw_url = f"https://raw.githubusercontent.com/{SWITCHER_REPO}/{tag}/gnome-theme-switcher.py"
+        install_dir = Path.home() / ".local" / "bin"
+        target = install_dir / "gnome-theme-switcher"
+        # Download to temp first
+        tmp = target.with_suffix(".tmp")
+        req = urllib.request.Request(raw_url, headers={"User-Agent": "gnome-theme-switcher"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            content = resp.read()
+        with open(tmp, "wb") as f:
+            f.write(content)
+        os.chmod(tmp, 0o755)
+        shutil.move(str(tmp), str(target))
+        return True, f"Updated to {tag}. Please restart the application."
+    except Exception as e:
+        return False, f"Update failed: {e}"
 
 
 # ─── Utility Functions ────────────────────────────────────────────────────────
@@ -258,7 +349,6 @@ def check_theme_installed(theme):
     gtk_name = theme.get("gtk_theme", "")
     if not gtk_name:
         return False
-    # Check user themes
     user_dir = Path.home() / ".themes" / gtk_name
     user_local_dir = Path.home() / ".local" / "share" / "themes" / gtk_name
     system_dir = Path("/usr/share/themes") / gtk_name
@@ -275,16 +365,98 @@ def detect_active_theme_index(themes):
     return -1
 
 
-def run_install_script(url):
-    """Run an install script from a URL using curl | bash in a subprocess."""
-    try:
-        proc = subprocess.Popen(
-            ["bash", "-c", f"curl -fsSL '{url}' | bash"],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
-        )
-        return proc
-    except Exception:
-        return None
+# ─── Install Process Manager ────────────────────────────────────────────────
+
+class InstallProcess:
+    """Manages a theme install subprocess with real-time output capture."""
+
+    def __init__(self, url, theme_name):
+        self.url = url
+        self.theme_name = theme_name
+        self.output_lines = []
+        self.running = False
+        self.finished = False
+        self.success = False
+        self.process = None
+        self.thread = None
+        self.scroll_offset = 0
+
+    def start(self):
+        """Start the install process in a background thread."""
+        self.running = True
+        self.finished = False
+        self.output_lines = [
+            f"╔══════════════════════════════════════════════════════════╗",
+            f"║  Installing: {self.theme_name:<43}║",
+            f"╚══════════════════════════════════════════════════════════╝",
+            "",
+            f"[INFO]  Downloading install script...",
+            f"[INFO]  URL: {self.url}",
+            "",
+        ]
+        self.thread = threading.Thread(target=self._run, daemon=True)
+        self.thread.start()
+
+    def _run(self):
+        """Run the install process and capture output."""
+        try:
+            # Download the script first, then run it with bash
+            # This avoids pipe issues and lets us capture all output
+            cmd = f"curl -fsSL '{self.url}' -o /tmp/_gts_install.sh && bash /tmp/_gts_install.sh"
+            self.process = subprocess.Popen(
+                ["bash", "-c", cmd],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                env={**os.environ, "DEBIAN_FRONTEND": "noninteractive"},
+            )
+            for line in iter(self.process.stdout.readline, ""):
+                # Strip ANSI escape codes for clean display
+                clean = self._strip_ansi(line.rstrip())
+                if clean:
+                    self.output_lines.append(clean)
+
+            self.process.wait()
+            self.success = (self.process.returncode == 0)
+        except Exception as e:
+            self.output_lines.append(f"[ERROR] {e}")
+            self.success = False
+        finally:
+            self.running = False
+            self.finished = True
+            if self.success:
+                self.output_lines.append("")
+                self.output_lines.append("═" * 58)
+                self.output_lines.append("  INSTALLATION COMPLETE! Press [Esc] to return to menu.")
+                self.output_lines.append("═" * 58)
+            else:
+                self.output_lines.append("")
+                self.output_lines.append("═" * 58)
+                self.output_lines.append("  INSTALLATION FAILED. Press [Esc] to return to menu.")
+                self.output_lines.append("═" * 58)
+            # Auto-scroll to bottom
+            self.scroll_offset = max(0, len(self.output_lines) - 20)
+            # Cleanup temp file
+            try:
+                os.remove("/tmp/_gts_install.sh")
+            except OSError:
+                pass
+
+    @staticmethod
+    def _strip_ansi(text):
+        """Remove ANSI escape sequences from text."""
+        import re
+        return re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', text)
+
+    def send_sudo_password(self, password):
+        """Send sudo password to the process stdin."""
+        if self.process and self.process.poll() is None:
+            try:
+                self.process.stdin.write(password + "\n")
+                self.process.stdin.flush()
+            except Exception:
+                pass
 
 
 # ─── TUI Application ─────────────────────────────────────────────────────────
@@ -300,14 +472,14 @@ class ThemeSwitcherTUI:
         self.status_msg = ""
         self.status_type = "info"  # info, success, error, warning
         self.active_index = detect_active_theme_index(self.themes)
-        self.mode = "browse"  # browse, install, add_custom, edit_custom, confirm
+        self.mode = "browse"  # browse, install_log, add_custom, edit_custom, confirm, help, update_prompt
         self.confirm_action = None
         self.confirm_callback = None
         self.form_fields = {}
         self.form_field_order = []
         self.form_cursor = 0
         self.install_proc = None
-        self.install_output = []
+        self.update_info = None  # Holds update check results
 
         # Initialize curses
         curses.curs_set(0)
@@ -357,6 +529,8 @@ class ThemeSwitcherTUI:
         """Draw the title bar at the top."""
         h, w = self.stdscr.getmaxyx()
         title = f"  GNOME Theme Switcher v{VERSION}"
+        if self.update_info and (self.update_info.get("switcher") or self.update_info.get("themes")):
+            title += "  [UPDATE AVAILABLE]"
         right = "Press [?] for help  "
         bar = title + " " * max(0, w - len(title) - len(right)) + right
         self.safe_addstr(0, 0, bar[:w-1], curses.color_pair(8) | curses.A_BOLD)
@@ -381,11 +555,18 @@ class ThemeSwitcherTUI:
         """Draw the keybindings bar above the status bar."""
         h, w = self.stdscr.getmaxyx()
         if self.mode == "browse":
-            keys = " [Enter] Apply  [i] Install  [a] Add Custom  [e] Edit  [d] Delete  [b] Backup  [r] Restore  [q] Quit"
+            keys = " [Enter] Apply  [i] Install  [a] Add  [e] Edit  [d] Del  [b] Backup  [r] Restore  [u] Update  [q] Quit"
         elif self.mode == "confirm":
             keys = " [y] Yes  [n] No / Cancel"
         elif self.mode in ("add_custom", "edit_custom"):
             keys = " [Tab] Next Field  [Shift+Tab] Prev  [Enter] on last field to Save  [Esc] Cancel"
+        elif self.mode == "install_log":
+            if self.install_proc and self.install_proc.running:
+                keys = " [↑/↓] Scroll  Installing... please wait"
+            else:
+                keys = " [↑/↓] Scroll  [Esc] Return to menu"
+        elif self.mode == "update_prompt":
+            keys = " [y] Update now  [n] Skip  [Esc] Cancel"
         else:
             keys = " [q] Quit"
         self.safe_addstr(h - 2, 0, keys[:w-1], curses.color_pair(6))
@@ -395,7 +576,7 @@ class ThemeSwitcherTUI:
         h, w = self.stdscr.getmaxyx()
         list_width = min(35, w // 2 - 1)
         list_start_y = 2
-        list_height = h - 5  # Leave room for title, keybinds, status
+        list_height = h - 5
 
         # Header
         self.safe_addstr(list_start_y, 1, "Themes", curses.color_pair(6) | curses.A_BOLD | curses.A_UNDERLINE)
@@ -413,7 +594,6 @@ class ThemeSwitcherTUI:
 
         for i, theme in enumerate(self.themes):
             if item_index < self.scroll_offset:
-                # Check if we need to account for category headers
                 cat = theme.get("category", "Custom")
                 if not theme.get("builtin", False):
                     cat = "Custom"
@@ -442,7 +622,6 @@ class ThemeSwitcherTUI:
             is_active = (i == self.active_index)
             installed = check_theme_installed(theme)
 
-            # Build the display string
             prefix = ">"  if is_selected else " "
             status_icon = "●" if is_active else ("◌" if installed else "○")
             name = theme["name"]
@@ -457,7 +636,6 @@ class ThemeSwitcherTUI:
             else:
                 attr = curses.color_pair(1) | curses.A_DIM
 
-            # Pad to fill the column
             entry = entry[:list_width].ljust(list_width)
             self.safe_addstr(draw_y, 1, entry, attr)
             draw_y += 1
@@ -537,7 +715,6 @@ class ThemeSwitcherTUI:
         if desc and panel_y < h - 5:
             self.safe_addstr(panel_y, panel_x, "Description:", curses.color_pair(6))
             panel_y += 1
-            # Word wrap
             words = desc.split()
             line = ""
             for word in words:
@@ -562,6 +739,66 @@ class ThemeSwitcherTUI:
             panel_y += 1
             self.safe_addstr(panel_y, panel_x, url[:panel_width - 1], curses.color_pair(1) | curses.A_DIM)
 
+    def draw_install_log(self):
+        """Draw the install log view (replaces the main view during install)."""
+        h, w = self.stdscr.getmaxyx()
+        if not self.install_proc:
+            return
+
+        # Title
+        self.safe_addstr(0, 0, " " * (w - 1), curses.color_pair(8))
+        title = f"  Installing: {self.install_proc.theme_name}"
+        if self.install_proc.running:
+            # Animated spinner
+            spinner = "|/-\\"
+            spin_char = spinner[int(time.time() * 4) % 4]
+            title += f"  [{spin_char}]"
+        elif self.install_proc.finished:
+            if self.install_proc.success:
+                title += "  [DONE]"
+            else:
+                title += "  [FAILED]"
+        self.safe_addstr(0, 0, title[:w-1], curses.color_pair(8) | curses.A_BOLD)
+
+        # Log area
+        log_start_y = 2
+        log_height = h - 5
+        lines = self.install_proc.output_lines
+        total = len(lines)
+
+        # Auto-scroll to bottom while running
+        if self.install_proc.running:
+            self.install_proc.scroll_offset = max(0, total - log_height)
+
+        offset = self.install_proc.scroll_offset
+        for i in range(log_height):
+            line_idx = offset + i
+            y = log_start_y + i
+            if line_idx < total:
+                line = lines[line_idx]
+                # Color coding
+                if "[OK]" in line or "COMPLETE" in line:
+                    attr = curses.color_pair(3)
+                elif "[ERROR]" in line or "FAILED" in line:
+                    attr = curses.color_pair(4)
+                elif "[WARN]" in line:
+                    attr = curses.color_pair(5)
+                elif "[INFO]" in line:
+                    attr = curses.color_pair(6)
+                elif "═" in line or "╔" in line or "╚" in line or "║" in line:
+                    attr = curses.color_pair(7) | curses.A_BOLD
+                else:
+                    attr = curses.color_pair(1)
+                self.safe_addstr(y, 1, line[:w-2], attr)
+            else:
+                self.safe_addstr(y, 1, "", curses.color_pair(1))
+
+        # Scroll position indicator
+        if total > log_height:
+            pct = int((offset / max(1, total - log_height)) * 100)
+            indicator = f" [{offset+1}-{min(offset+log_height, total)}/{total}] {pct}%"
+            self.safe_addstr(1, w - len(indicator) - 2, indicator, curses.color_pair(6))
+
     def draw_confirm_dialog(self):
         """Draw a confirmation dialog in the center of the screen."""
         h, w = self.stdscr.getmaxyx()
@@ -571,23 +808,19 @@ class ThemeSwitcherTUI:
         start_y = (h - box_h) // 2
         start_x = (w - box_w) // 2
 
-        # Draw box
         for y in range(start_y, start_y + box_h):
             self.safe_addstr(y, start_x, " " * box_w, curses.color_pair(8))
 
-        # Border
         self.safe_addstr(start_y, start_x, "┌" + "─" * (box_w - 2) + "┐", curses.color_pair(8))
         for y in range(start_y + 1, start_y + box_h - 1):
             self.safe_addstr(y, start_x, "│", curses.color_pair(8))
             self.safe_addstr(y, start_x + box_w - 1, "│", curses.color_pair(8))
         self.safe_addstr(start_y + box_h - 1, start_x, "└" + "─" * (box_w - 2) + "┘", curses.color_pair(8))
 
-        # Title
         title = " Confirm "
         title_x = start_x + (box_w - len(title)) // 2
         self.safe_addstr(start_y, title_x, title, curses.color_pair(11) | curses.A_BOLD)
 
-        # Message (word wrap)
         inner_w = box_w - 4
         words = msg.split()
         lines = []
@@ -604,10 +837,44 @@ class ThemeSwitcherTUI:
         for i, ln in enumerate(lines[:3]):
             self.safe_addstr(start_y + 2 + i, start_x + 2, ln, curses.color_pair(8))
 
-        # Buttons
         btn_text = "[Y] Yes    [N] No"
         btn_x = start_x + (box_w - len(btn_text)) // 2
         self.safe_addstr(start_y + box_h - 2, btn_x, btn_text, curses.color_pair(8) | curses.A_BOLD)
+
+    def draw_update_dialog(self):
+        """Draw an update notification dialog."""
+        h, w = self.stdscr.getmaxyx()
+        box_w = min(64, w - 4)
+        lines = [" Updates Available "]
+        if self.update_info.get("switcher"):
+            sw = self.update_info["switcher"]
+            lines.append(f"  Theme Switcher: {sw['current']} -> {sw['latest']}")
+        if self.update_info.get("themes"):
+            th = self.update_info["themes"]
+            lines.append(f"  Theme Collection: {th['current']} -> {th['latest']}")
+        lines.append("")
+        lines.append("  [Y] Update now    [N] Skip this time")
+
+        box_h = len(lines) + 4
+        start_y = (h - box_h) // 2
+        start_x = (w - box_w) // 2
+
+        for y in range(start_y, start_y + box_h):
+            self.safe_addstr(y, start_x, " " * box_w, curses.color_pair(8))
+
+        self.safe_addstr(start_y, start_x, "┌" + "─" * (box_w - 2) + "┐", curses.color_pair(8))
+        for y in range(start_y + 1, start_y + box_h - 1):
+            self.safe_addstr(y, start_x, "│", curses.color_pair(8))
+            self.safe_addstr(y, start_x + box_w - 1, "│", curses.color_pair(8))
+        self.safe_addstr(start_y + box_h - 1, start_x, "└" + "─" * (box_w - 2) + "┘", curses.color_pair(8))
+
+        # Title
+        title = lines[0]
+        title_x = start_x + (box_w - len(title)) // 2
+        self.safe_addstr(start_y, title_x, title, curses.color_pair(11) | curses.A_BOLD)
+
+        for i, ln in enumerate(lines[1:]):
+            self.safe_addstr(start_y + 2 + i, start_x + 2, ln[:box_w - 4], curses.color_pair(8))
 
     def draw_form(self, title, fields, field_order, cursor_pos):
         """Draw a form dialog for adding/editing custom themes."""
@@ -617,11 +884,9 @@ class ThemeSwitcherTUI:
         start_y = max(1, (h - box_h) // 2)
         start_x = max(1, (w - box_w) // 2)
 
-        # Clear area
         for y in range(start_y, min(start_y + box_h, h)):
             self.safe_addstr(y, start_x, " " * box_w, curses.color_pair(8))
 
-        # Border
         self.safe_addstr(start_y, start_x, "┌" + "─" * (box_w - 2) + "┐", curses.color_pair(8))
         for y in range(start_y + 1, min(start_y + box_h - 1, h - 1)):
             self.safe_addstr(y, start_x, "│", curses.color_pair(8))
@@ -629,12 +894,10 @@ class ThemeSwitcherTUI:
         if start_y + box_h - 1 < h:
             self.safe_addstr(start_y + box_h - 1, start_x, "└" + "─" * (box_w - 2) + "┘", curses.color_pair(8))
 
-        # Title
         title_str = f" {title} "
         title_x = start_x + (box_w - len(title_str)) // 2
         self.safe_addstr(start_y, title_x, title_str, curses.color_pair(12) | curses.A_BOLD)
 
-        # Fields
         inner_w = box_w - 4
         draw_y = start_y + 2
         for i, key in enumerate(field_order):
@@ -644,15 +907,12 @@ class ThemeSwitcherTUI:
             value = fields.get(key, "")
             is_active = (i == cursor_pos)
 
-            # Label
             label_attr = curses.color_pair(8) | curses.A_BOLD if is_active else curses.color_pair(8)
             self.safe_addstr(draw_y, start_x + 2, label[:inner_w], label_attr)
             draw_y += 1
 
-            # Value field
             if is_active:
                 field_attr = curses.color_pair(2)
-                # Show cursor
                 display = value + "█"
             else:
                 field_attr = curses.color_pair(8) | curses.A_DIM
@@ -662,7 +922,6 @@ class ThemeSwitcherTUI:
             self.safe_addstr(draw_y, start_x + 2, display.ljust(inner_w), field_attr)
             draw_y += 1
 
-        # Footer
         if draw_y < start_y + box_h - 1:
             footer = "[Tab] Next  [Esc] Cancel  [Enter on last] Save"
             footer_x = start_x + (box_w - len(footer)) // 2
@@ -678,14 +937,14 @@ class ThemeSwitcherTUI:
             "  ──────────────────────────────────────────",
             "",
             "  Navigation:",
-            "    ↑ / k         Move up",
-            "    ↓ / j         Move down",
+            "    Up / k         Move up",
+            "    Down / j       Move down",
             "    Home / g       Jump to first theme",
             "    End / G        Jump to last theme",
             "",
             "  Actions:",
             "    Enter          Apply selected theme",
-            "    i              Install selected theme (curl | bash)",
+            "    i              Install selected theme",
             "    a              Add a custom theme",
             "    e              Edit selected custom theme",
             "    d              Delete selected custom theme",
@@ -693,6 +952,9 @@ class ThemeSwitcherTUI:
             "  Backup / Restore:",
             "    b              Backup current theme settings",
             "    r              Restore theme from backup",
+            "",
+            "  Updates:",
+            "    u              Check for updates",
             "",
             "  Other:",
             "    ?              Show this help screen",
@@ -723,8 +985,6 @@ class ThemeSwitcherTUI:
             if start_y + 1 + i < h - 1:
                 if "──" in line or "Shortcuts" in line:
                     attr = curses.color_pair(8) | curses.A_BOLD
-                elif line.strip().startswith("●") or line.strip().startswith("◌") or line.strip().startswith("○"):
-                    attr = curses.color_pair(8)
                 else:
                     attr = curses.color_pair(8)
                 self.safe_addstr(start_y + 1 + i, start_x + 1, line[:box_w - 3], attr)
@@ -732,19 +992,29 @@ class ThemeSwitcherTUI:
     def draw(self):
         """Main draw method."""
         self.stdscr.erase()
-        self.draw_title_bar()
-        self.draw_theme_list()
-        self.draw_detail_panel()
-        self.draw_keybinds_bar()
-        self.draw_status_bar()
 
-        if self.mode == "confirm":
-            self.draw_confirm_dialog()
-        elif self.mode in ("add_custom", "edit_custom"):
-            title = "Add Custom Theme" if self.mode == "add_custom" else "Edit Custom Theme"
-            self.draw_form(title, self.form_fields, self.form_field_order, self.form_cursor)
-        elif self.mode == "help":
-            self.draw_help_screen()
+        if self.mode == "install_log":
+            # Full-screen install log view
+            self.draw_install_log()
+            self.draw_keybinds_bar()
+            self.draw_status_bar()
+        else:
+            # Normal browse view
+            self.draw_title_bar()
+            self.draw_theme_list()
+            self.draw_detail_panel()
+            self.draw_keybinds_bar()
+            self.draw_status_bar()
+
+            if self.mode == "confirm":
+                self.draw_confirm_dialog()
+            elif self.mode in ("add_custom", "edit_custom"):
+                title = "Add Custom Theme" if self.mode == "add_custom" else "Edit Custom Theme"
+                self.draw_form(title, self.form_fields, self.form_field_order, self.form_cursor)
+            elif self.mode == "help":
+                self.draw_help_screen()
+            elif self.mode == "update_prompt":
+                self.draw_update_dialog()
 
         self.stdscr.refresh()
 
@@ -816,7 +1086,6 @@ class ThemeSwitcherTUI:
         custom_themes = load_custom_themes()
 
         if self.mode == "edit_custom":
-            # Find the custom theme index
             builtin_count = len(BUILTIN_THEMES)
             custom_index = self.selected - builtin_count
             if 0 <= custom_index < len(custom_themes):
@@ -839,9 +1108,9 @@ class ThemeSwitcherTUI:
 
         current_field = self.form_field_order[self.form_cursor]
 
-        if key == 9:  # Tab — next field
+        if key == 9:  # Tab
             self.form_cursor = (self.form_cursor + 1) % len(self.form_field_order)
-        elif key == curses.KEY_BTAB or key == 353:  # Shift+Tab — prev field
+        elif key == curses.KEY_BTAB or key == 353:  # Shift+Tab
             self.form_cursor = (self.form_cursor - 1) % len(self.form_field_order)
         elif key == 10 or key == curses.KEY_ENTER:  # Enter
             if self.form_cursor == len(self.form_field_order) - 1:
@@ -851,7 +1120,7 @@ class ThemeSwitcherTUI:
         elif key == curses.KEY_BACKSPACE or key == 127 or key == 8:
             val = self.form_fields.get(current_field, "")
             self.form_fields[current_field] = val[:-1]
-        elif 32 <= key <= 126:  # Printable characters
+        elif 32 <= key <= 126:
             val = self.form_fields.get(current_field, "")
             self.form_fields[current_field] = val + chr(key)
 
@@ -861,13 +1130,86 @@ class ThemeSwitcherTUI:
             if self.confirm_callback:
                 self.confirm_callback()
             self.mode = "browse"
-        elif key in (ord('n'), ord('N'), 27):  # n, N, or Escape
+        elif key in (ord('n'), ord('N'), 27):
             self.mode = "browse"
             self.set_status("Cancelled.", "info")
 
+    def handle_install_log_input(self, key):
+        """Handle input in install log mode."""
+        if not self.install_proc:
+            self.mode = "browse"
+            return
+
+        if key == 27:  # Escape
+            if self.install_proc.finished:
+                self.mode = "browse"
+                self.refresh_themes()
+                if self.install_proc.success:
+                    self.set_status(f"'{self.install_proc.theme_name}' installed successfully! Press [Enter] to apply.", "success")
+                else:
+                    self.set_status(f"Installation of '{self.install_proc.theme_name}' failed. Check the log.", "error")
+                self.install_proc = None
+            else:
+                self.set_status("Installation still running... please wait.", "warning")
+        elif key in (curses.KEY_UP, ord('k')):
+            if self.install_proc.scroll_offset > 0:
+                self.install_proc.scroll_offset -= 1
+        elif key in (curses.KEY_DOWN, ord('j')):
+            max_offset = max(0, len(self.install_proc.output_lines) - 20)
+            if self.install_proc.scroll_offset < max_offset:
+                self.install_proc.scroll_offset += 1
+        elif key in (curses.KEY_HOME, ord('g')):
+            self.install_proc.scroll_offset = 0
+        elif key in (curses.KEY_END, ord('G')):
+            self.install_proc.scroll_offset = max(0, len(self.install_proc.output_lines) - 20)
+
+    def handle_update_prompt_input(self, key):
+        """Handle input in update prompt mode."""
+        if key in (ord('y'), ord('Y')):
+            self.mode = "browse"
+            if self.update_info and self.update_info.get("switcher"):
+                self.set_status("Updating theme switcher...", "info")
+                self.draw()
+                success, msg = self_update()
+                if success:
+                    self.set_status(msg, "success")
+                else:
+                    self.set_status(msg, "error")
+            else:
+                self.set_status("No switcher update needed. Theme repo updates are noted.", "info")
+        elif key in (ord('n'), ord('N'), 27):
+            self.mode = "browse"
+            self.set_status("Update skipped.", "info")
+
+    def do_update_check(self):
+        """Perform update check and show dialog if updates available."""
+        self.set_status("Checking for updates...", "info")
+        self.draw()
+        results = check_for_updates()
+        save_update_check(results)
+        if results.get("switcher") or results.get("themes"):
+            self.update_info = results
+            self.mode = "update_prompt"
+        else:
+            self.set_status(f"Everything is up to date! (v{VERSION})", "success")
+
     def run(self):
         """Main event loop."""
-        self.set_status("Welcome! Use ↑/↓ to browse themes, Enter to apply, [?] for help.", "info")
+        self.set_status("Welcome! Use Up/Down to browse themes, Enter to apply, [?] for help.", "info")
+
+        # Check for updates on startup (non-blocking, only if due)
+        if should_check_updates():
+            try:
+                results = check_for_updates()
+                save_update_check(results)
+                if results.get("switcher") or results.get("themes"):
+                    self.update_info = results
+                    self.mode = "update_prompt"
+            except Exception:
+                pass  # Silently skip if network unavailable
+
+        # Use a short timeout for getch so we can refresh the install log
+        self.stdscr.timeout(250)  # 250ms refresh rate
 
         while True:
             self.draw()
@@ -875,6 +1217,9 @@ class ThemeSwitcherTUI:
                 key = self.stdscr.getch()
             except KeyboardInterrupt:
                 break
+
+            if key == -1:  # Timeout (no key pressed)
+                continue
 
             if key == curses.KEY_RESIZE:
                 continue
@@ -884,12 +1229,20 @@ class ThemeSwitcherTUI:
                 self.mode = "browse"
                 continue
 
+            if self.mode == "update_prompt":
+                self.handle_update_prompt_input(key)
+                continue
+
             if self.mode == "confirm":
                 self.handle_confirm_input(key)
                 continue
 
             if self.mode in ("add_custom", "edit_custom"):
                 self.handle_form_input(key)
+                continue
+
+            if self.mode == "install_log":
+                self.handle_install_log_input(key)
                 continue
 
             # Browse mode
@@ -922,13 +1275,13 @@ class ThemeSwitcherTUI:
                     self.set_status(f"Theme '{theme['name']}' is not installed. Press [i] to install first.", "warning")
                     continue
 
-                def do_apply():
+                def do_apply(t=theme):
                     backup_current_theme()
-                    if apply_theme(theme):
+                    if apply_theme(t):
                         self.active_index = self.selected
-                        self.set_status(f"Applied '{theme['name']}' successfully! (Previous theme backed up)", "success")
+                        self.set_status(f"Applied '{t['name']}' successfully! Previous theme backed up. Log out to see full changes.", "success")
                     else:
-                        self.set_status(f"Failed to apply '{theme['name']}'. Some gsettings may not be available.", "error")
+                        self.set_status(f"Failed to apply '{t['name']}'. Some gsettings may not be available.", "error")
 
                 self.confirm_action = f"Apply theme '{theme['name']}'? This will change your GTK, Shell, Icons, and Cursors."
                 self.confirm_callback = do_apply
@@ -943,34 +1296,13 @@ class ThemeSwitcherTUI:
                     self.set_status(f"No install URL for '{theme['name']}'. Install manually.", "warning")
                     continue
 
-                def do_install():
-                    self.set_status(f"Installing '{theme['name']}'... This will open a new terminal.", "info")
-                    self.draw()
-                    try:
-                        # Run in a visible terminal so user can see progress and enter sudo password
-                        cmd = f"curl -fsSL '{url}' | bash"
-                        # Try various terminal emulators
-                        terminals = [
-                            ["gnome-terminal", "--", "bash", "-c", f"{cmd}; echo ''; echo 'Press Enter to close...'; read"],
-                            ["xfce4-terminal", "-e", f"bash -c \"{cmd}; echo ''; echo 'Press Enter to close...'; read\""],
-                            ["xterm", "-e", f"bash -c \"{cmd}; echo ''; echo 'Press Enter to close...'; read\""],
-                        ]
-                        launched = False
-                        for term_cmd in terminals:
-                            if shutil.which(term_cmd[0]):
-                                subprocess.Popen(term_cmd)
-                                launched = True
-                                break
+                def do_install(u=url, t=theme):
+                    self.install_proc = InstallProcess(u, t["name"])
+                    self.install_proc.start()
+                    self.mode = "install_log"
+                    self.set_status(f"Installing '{t['name']}'...", "info")
 
-                        if not launched:
-                            # Fallback: run in background and notify
-                            subprocess.Popen(["bash", "-c", cmd])
-
-                        self.set_status(f"Install script launched for '{theme['name']}' in a new terminal window.", "success")
-                    except Exception as e:
-                        self.set_status(f"Failed to launch installer: {e}", "error")
-
-                self.confirm_action = f"Install '{theme['name']}'? This will download and run the install script in a new terminal window."
+                self.confirm_action = f"Install '{theme['name']}'? This will download and run the install script."
                 self.confirm_callback = do_install
                 self.mode = "confirm"
 
@@ -1023,6 +1355,9 @@ class ThemeSwitcherTUI:
                 self.confirm_action = f"Restore theme from backup ({ts})? GTK: {backup.get('gtk_theme', '?')}"
                 self.confirm_callback = do_restore
                 self.mode = "confirm"
+
+            elif key in (ord('u'), ord('U')):  # Update check
+                self.do_update_check()
 
 
 def main(stdscr):
