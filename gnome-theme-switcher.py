@@ -27,10 +27,10 @@ CUSTOM_THEMES_FILE = CONFIG_DIR / "custom_themes.json"
 BACKUP_FILE = CONFIG_DIR / "backup.json"
 SETTINGS_FILE = CONFIG_DIR / "settings.json"
 
-VERSION = "1.0.0"
+VERSION = "1.2.0"
 
 # ─── Base URL for install scripts ─────────────────────────────────────────────
-REPO_BASE = "https://raw.githubusercontent.com/Naftaliro/zorinos-gnome-themes/v1.0.0"
+REPO_BASE = "https://raw.githubusercontent.com/Naftaliro/zorinos-gnome-themes/v1.2.0"
 
 # ─── Built-in Theme Definitions ──────────────────────────────────────────────
 BUILTIN_THEMES = [

@@ -38,7 +38,7 @@ This project is an independent, unofficial tool. It is **not affiliated with, en
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  GNOME Theme Switcher v1.0.0                           Press [?] for help  │
+│  GNOME Theme Switcher v1.2.0                           Press [?] for help  │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                │                                            │
 │  Themes                        │ Details                                    │
@@ -69,7 +69,7 @@ This project is an independent, unofficial tool. It is **not affiliated with, en
 
 ```bash
 # Step 1: Download the installer
-curl -fsSL https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/v1.0.0/install.sh -o gts-install.sh
+curl -fsSL https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/v1.2.0/install.sh -o gts-install.sh
 
 # Step 2: Verify the checksum (compare against SHA256SUMS.txt in this repo)
 sha256sum gts-install.sh
@@ -88,7 +88,7 @@ SHA-256 checksums for all files are published in the **[SHA256SUMS.txt](SHA256SU
 For convenience, the installer can also be run directly. **By using this method, you are trusting the code at the current HEAD of this repository.**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/v1.0.0/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/v1.2.0/install.sh | bash
 ```
 
 This downloads the application to `~/.local/bin/gnome-theme-switcher` and adds it to your PATH.
