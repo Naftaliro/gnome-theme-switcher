@@ -13,7 +13,7 @@
 # Usage:
 #   chmod +x install.sh && ./install.sh
 #   # or
-#   curl -fsSL https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/v1.4.0/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/v1.5.0/install.sh | bash
 #
 
 set -euo pipefail
@@ -26,7 +26,7 @@ warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 INSTALL_DIR="${HOME}/.local/bin"
 CONFIG_DIR="${HOME}/.config/gnome-theme-switcher"
 APP_NAME="gnome-theme-switcher"
-REPO_RAW="https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/v1.4.0"
+REPO_RAW="https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/v1.5.0"
 
 echo -e "${BOLD}"
 cat << 'EOF'
