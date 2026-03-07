@@ -35,14 +35,15 @@ This project was created with the significant assistance of AI. For full details
 | **Backup / Restore** | Automatically backs up your current theme before switching; restore anytime |
 | **Active Detection** | Shows which theme is currently active and which are installed |
 | **Auto-Update** | Checks GitHub for new versions on startup and offers one-click self-update |
-| **In-TUI Install Log** | Theme installation runs in-app with a live scrollable log — no separate terminal needed |
+| **Interactive Install** | Theme installation suspends the TUI and runs in your real terminal — you can see all output and enter your sudo password naturally. TUI resumes automatically when done. |
 | **Zero Dependencies** | Uses only Python 3 standard library (`curses`, `json`, `subprocess`, `urllib`) |
+| **Error Codes** | All errors include a machine-readable code (GTS-E0xx) with a human-readable message for easy troubleshooting |
 
 ## Screenshot
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  GNOME Theme Switcher v1.3.0                           Press [?] for help  │
+│  GNOME Theme Switcher v1.4.0                           Press [?] for help  │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                │                                            │
 │  Themes                        │ Details                                    │
@@ -73,7 +74,7 @@ This project was created with the significant assistance of AI. For full details
 
 ```bash
 # Step 1: Download the installer
-curl -fsSL https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/v1.3.0/install.sh -o gts-install.sh
+curl -fsSL https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/v1.4.0/install.sh -o gts-install.sh
 
 # Step 2: Verify the checksum (compare against SHA256SUMS.txt in this repo)
 sha256sum gts-install.sh
@@ -92,7 +93,7 @@ SHA-256 checksums for all files are published in the **[SHA256SUMS.txt](SHA256SU
 For convenience, the installer can also be run directly. **By using this method, you are trusting the code at the current HEAD of this repository.**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/v1.3.0/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/v1.4.0/install.sh | bash
 ```
 
 This downloads the application to `~/.local/bin/gnome-theme-switcher` and adds it to your PATH.
@@ -116,7 +117,9 @@ gnome-theme-switcher
 | `a` | Add a new custom theme |
 | `e` | Edit the selected custom theme |
 | `d` | Delete the selected custom theme |
+| `b` | Backup current theme settings |
 | `r` | Restore the last theme settings |
+| `u` | Check for updates |
 | `?` | Show help screen |
 | `q` | Quit |
 
@@ -155,3 +158,27 @@ The install scripts for these themes are maintained in the [zorinos-gnome-themes
 ## License
 
 This application is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for the full text.
+
+## Error Codes
+
+When something goes wrong, the application displays a structured error code for easy troubleshooting.
+
+| Code | Meaning |
+|---|---|
+| `GTS-E000` | Success (no error) |
+| `GTS-E001` | General / unexpected error |
+| `GTS-E002` | Not running in a terminal (TTY required) |
+| `GTS-E003` | Failed to initialize curses TUI |
+| `GTS-E004` | Cannot create or access config directory |
+| `GTS-E005` | `gsettings` not found (GNOME not installed?) |
+| `GTS-E010` | Network error (no internet connection) |
+| `GTS-E011` | Download failed (bad URL or HTTP error) |
+| `GTS-E012` | Install script exited with an error |
+| `GTS-E013` | Dependency installation failed (apt/dnf) |
+| `GTS-E014` | Permission denied (sudo password issue) |
+| `GTS-E015` | Installation timed out (10 minute limit) |
+| `GTS-E020` | Self-update failed |
+| `GTS-E030` | Backup failed |
+| `GTS-E031` | Restore from backup failed |
+
+If you encounter an error, check the log file at `~/.config/gnome-theme-switcher/last_install.log` for details.
