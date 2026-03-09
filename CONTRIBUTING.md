@@ -18,9 +18,9 @@ Thank you for your interest in contributing to the GNOME Theme Switcher! Whether
 
 If you want to add a new built-in theme to the switcher:
 
-1. Add a new entry to the `BUILTIN_THEMES` list in `gnome-theme-switcher.py`.
+1. Add a new entry to the `FALLBACK_THEMES` list in `gnome-theme-switcher.py`, or add the theme to `themes.json` in the [zorinos-gnome-themes](https://github.com/Naftaliro/zorinos-gnome-themes) repository (preferred).
 2. Follow the existing dictionary structure with all required keys:
-   - `name`, `category`, `gtk_theme`, `shell_theme`, `icon_theme`, `cursor_theme`, `color_scheme`, `install_url`, `description`, `builtin`
+   - `name`, `category`, `gtk_theme`, `shell_theme`, `icon_theme`, `cursor_theme`, `color_scheme`, `install_script`, `description`
 3. Ensure the corresponding install script exists in the [zorinos-gnome-themes](https://github.com/Naftaliro/zorinos-gnome-themes) repository.
 4. Update `THIRD_PARTY_NOTICES.md` if the theme introduces new upstream dependencies.
 
