@@ -20,6 +20,7 @@ import re
 import subprocess
 import sys
 import shutil
+import tempfile
 import time
 import traceback
 import urllib.request
@@ -676,7 +677,9 @@ def run_install_in_terminal(url, theme_name):
 
     Returns (success, return_code, error_code).
     """
-    script_path = "/tmp/_gts_install.sh"
+    # Use tempfile.mkstemp to avoid TOCTOU race conditions with predictable paths.
+    fd, script_path = tempfile.mkstemp(prefix="gts-install-", suffix=".sh", dir="/tmp")
+    os.close(fd)
 
     # Clear the log file for this install
     try:
@@ -693,12 +696,12 @@ def run_install_in_terminal(url, theme_name):
     DIM = "\033[2m"
     RESET = "\033[0m"
 
-    print(f"\n{BOLD}{CYAN}{'=' * 70}{RESET}")
+    print(f"\n{BOLD}{CYAN}{"=" * 70}{RESET}")
     print(f"{BOLD}{CYAN}  GNOME Theme Switcher - Installing: {theme_name}{RESET}")
-    print(f"{BOLD}{CYAN}{'=' * 70}{RESET}")
+    print(f"{BOLD}{CYAN}{"=" * 70}{RESET}")
     print(f"{DIM}  Source: {url}{RESET}")
     print(f"{DIM}  Log:    {LOG_FILE}{RESET}")
-    print(f"{CYAN}{'─' * 70}{RESET}\n")
+    print(f"{CYAN}{"─" * 70}{RESET}\n")
 
     # ── Step 1: Download the script ──
     print(f"{YELLOW}[1/2]{RESET} Downloading install script...")
