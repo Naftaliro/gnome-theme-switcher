@@ -1,45 +1,6 @@
-# GNOME Theme Switcher
+# gnome theme switcher
 
-> A terminal-based theme manager for switching between system-wide GNOME themes.
-
-**GNOME Theme Switcher** is a lightweight TUI (Terminal User Interface) application built with Python's `curses` library. It has **zero external dependencies** — just Python 3 and a terminal. It ships with 9 pre-configured themes from the [zorinos-gnome-themes](https://github.com/Naftaliro/zorinos-gnome-themes) collection and supports adding your own custom themes.
-
----
-
-### Legal Notice and Disclaimer
-
-**This software is provided "as is", without warranty of any kind, express or implied. Use at your own risk.**
-
-This application modifies system configuration files and desktop settings via `gsettings`. The author and contributors of this project are not responsible for any damage to your system, loss of data, or any other issues that may arise from its use. It is your responsibility to back up your data and understand the risks involved.
-
-This project is an independent, unofficial tool. It is **not affiliated with, endorsed by, or connected to** any of the upstream theme authors (such as vinceliuice, Catppuccin, yeyushengfan258, etc.), GNOME, or any Linux distribution.
-
----
-
-### Trademarks
-
-"GNOME" is a trademark of The GNOME Foundation. "ZorinOS" is a trademark of Zorin Group. "macOS" and "Apple" are trademarks of Apple Inc. "Windows" and "Microsoft" are trademarks of Microsoft Corporation. "Ubuntu" is a trademark of Canonical Ltd. All other product names, logos, and brands are the property of their respective owners. These names are used in this project solely to describe compatibility and visual inspiration, and their use does not imply any affiliation or endorsement.
-
----
-
-## Features
-
-| Feature | Description |
-|---|---|
-| **Browse Themes** | Navigate 9 built-in themes organized by category (macOS, Windows, Linux-Native) |
-| **Apply Instantly** | Switch your entire desktop (GTK, Shell, Icons, Cursors) with a single Enter keypress |
-| **Install Themes** | Download and install themes directly from the TUI via install scripts |
-| **Custom Themes** | Add, edit, and delete your own custom theme configurations |
-| **Backup / Restore** | Automatically backs up your current theme before switching; restore anytime |
-| **Active Detection** | Shows which theme is currently active and which are installed |
-| **Auto-Update** | Checks GitHub for new versions on startup and offers one-click self-update |
-| **Interactive Install** | Theme installation suspends the TUI and runs in your real terminal — you can see all output and enter your sudo password naturally. TUI resumes automatically when done. |
-| **Zero Dependencies** | Uses only Python 3 standard library (`curses`, `json`, `subprocess`, `urllib`) |
-| **Theme Previews** | ASCII art previews for each theme displayed in the detail panel — toggle with [p] |
-| **Remote Theme List** | Theme definitions are fetched from the themes repo and cached locally — new themes appear automatically when the repo is updated. Press [S] in the update dialog to sync. |
-| **Error Codes** | All errors include a machine-readable code (GTS-E0xx) with a human-readable message for easy troubleshooting |
-
-## Screenshot
+a terminal app for switching gnome themes. it's one python file using `curses`, so all you need is python 3. it comes with the 9 themes from [zorinos-gnome-themes](https://github.com/Naftaliro/zorinos-gnome-themes) and you can add your own.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -68,117 +29,98 @@ This project is an independent, unofficial tool. It is **not affiliated with, en
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Installation
+## what it does
 
-### Recommended: Download, Inspect, Then Run
+- browse the themes by category (macos, windows, linux)
+- enter applies gtk, shell, icons and cursors all at once
+- installs themes too. it drops out to your real terminal for that so you can see what's happening and type your sudo password, then comes back
+- add, edit and delete your own themes
+- backs up your current theme before switching, restore it any time
+- shows which theme is active and which ones are installed
+- ascii previews (`p`)
+- the theme list comes from the themes repo and gets cached, so new themes show up on their own (`S` in the update dialog to sync)
+- checks for updates when it starts and can update itself
+- error codes when stuff breaks (table at the bottom)
+
+## install
+
+download it, check it against [SHA256SUMS.txt](SHA256SUMS.txt), read it, run it:
 
 ```bash
-# Step 1: Download the installer
 curl -fsSL https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/v1.5.0/install.sh -o gts-install.sh
-
-# Step 2: Verify the checksum (compare against SHA256SUMS.txt in this repo)
 sha256sum gts-install.sh
-
-# Step 3: Review the script
 less gts-install.sh
-
-# Step 4: Run it
 chmod +x gts-install.sh && ./gts-install.sh
 ```
 
-SHA-256 checksums for all files are published in the **[SHA256SUMS.txt](SHA256SUMS.txt)** file and in each GitHub Release.
-
-### Quick Install (One-Liner)
-
-For convenience, the installer can also be run directly. **By using this method, you are trusting the code at the current HEAD of this repository.**
+or in one line if you trust it:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Naftaliro/gnome-theme-switcher/v1.5.0/install.sh | bash
 ```
 
-This downloads the application to `~/.local/bin/gnome-theme-switcher` and adds it to your PATH.
+it goes in `~/.local/bin/gnome-theme-switcher` and gets added to your PATH. then just run `gnome-theme-switcher`.
 
-## Usage
+## keys
 
-After installation, simply run:
-
-```bash
-gnome-theme-switcher
-```
-
-### Keyboard Shortcuts
-
-| Key | Action |
+| key | does |
 |---|---|
-| `Up` / `k` | Move selection up |
-| `Down` / `j` | Move selection down |
-| `Enter` | Apply the selected theme |
-| `i` | Install the selected theme (runs install script) |
-| `a` | Add a new custom theme |
-| `e` | Edit the selected custom theme |
-| `d` | Delete the selected custom theme |
-| `b` | Backup current theme settings |
-| `r` | Restore the last theme settings |
-| `u` | Check for updates |
-| `?` | Show help screen |
-| `q` | Quit |
+| `↑` / `k` | up |
+| `↓` / `j` | down |
+| `Enter` | apply the theme |
+| `i` | install the theme |
+| `a` | add a custom theme |
+| `e` | edit a custom theme |
+| `d` | delete a custom theme |
+| `b` | back up your current theme |
+| `r` | restore the backup |
+| `u` | check for updates |
+| `?` | help |
+| `q` | quit |
 
-## Uninstall
+## uninstall
 
 ```bash
 gnome-theme-switcher-uninstall
+rm -rf ~/.config/gnome-theme-switcher/   # if you want the settings gone too
 ```
 
-To also remove configuration files:
+## works on
 
-```bash
-rm -rf ~/.config/gnome-theme-switcher/
-```
+ubuntu 22.04+, zorin os 18+ and other gnome distros. gnome 42+, python 3.8+.
 
-## Upstream Themes and Credits
+## credits
 
-This tool includes pre-configured settings for themes created by the open-source community. **All credit for the themes themselves goes to their original authors.** Please support their work.
+the themes belong to the people who made them:
 
-| Theme | Original Author(s) | License |
+| theme | by | license |
 |---|---|---|
-| WhiteSur, Colloid, Fluent, Orchis, Graphite, Lavanda, Tela Icons | [vinceliuice](https://github.com/vinceliuice) | GPL-3.0 |
+| WhiteSur, Colloid, Fluent, Orchis, Graphite, Lavanda, Tela icons | [vinceliuice](https://github.com/vinceliuice) | GPL-3.0 |
 | We10X, Win11 | [yeyushengfan258](https://github.com/yeyushengfan258) | GPL-3.0 |
-| Catppuccin | [Catppuccin](https://github.com/catppuccin) and [Fausto-Korpsvart](https://github.com/Fausto-Korpsvart) | MIT / GPL-3.0 |
+| Catppuccin | [catppuccin](https://github.com/catppuccin) and [Fausto-Korpsvart](https://github.com/Fausto-Korpsvart) | MIT / GPL-3.0 |
 
-The install scripts for these themes are maintained in the [zorinos-gnome-themes](https://github.com/Naftaliro/zorinos-gnome-themes) repository.
+## error codes
 
-## Compatibility
-
-| Field | Value |
+| code | meaning |
 |---|---|
-| **OS** | Ubuntu 22.04+, ZorinOS 18+, and other modern GNOME-based distros |
-| **Desktop** | GNOME 42+ |
-| **Python** | 3.8+ |
+| `GTS-E000` | fine, no error |
+| `GTS-E001` | something unexpected |
+| `GTS-E002` | not running in a terminal |
+| `GTS-E003` | curses wouldn't start |
+| `GTS-E004` | can't make or read the config folder |
+| `GTS-E005` | `gsettings` not found (is gnome installed?) |
+| `GTS-E010` | no internet |
+| `GTS-E011` | download failed |
+| `GTS-E012` | the install script failed |
+| `GTS-E013` | installing dependencies failed (apt/dnf) |
+| `GTS-E014` | permission denied (sudo password?) |
+| `GTS-E015` | install took longer than 10 minutes |
+| `GTS-E020` | self update failed |
+| `GTS-E030` | backup failed |
+| `GTS-E031` | restore failed |
 
-## License
+the install log is at `~/.config/gnome-theme-switcher/last_install.log`.
 
-This application is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for the full text.
+## license
 
-## Error Codes
-
-When something goes wrong, the application displays a structured error code for easy troubleshooting.
-
-| Code | Meaning |
-|---|---|
-| `GTS-E000` | Success (no error) |
-| `GTS-E001` | General / unexpected error |
-| `GTS-E002` | Not running in a terminal (TTY required) |
-| `GTS-E003` | Failed to initialize curses TUI |
-| `GTS-E004` | Cannot create or access config directory |
-| `GTS-E005` | `gsettings` not found (GNOME not installed?) |
-| `GTS-E010` | Network error (no internet connection) |
-| `GTS-E011` | Download failed (bad URL or HTTP error) |
-| `GTS-E012` | Install script exited with an error |
-| `GTS-E013` | Dependency installation failed (apt/dnf) |
-| `GTS-E014` | Permission denied (sudo password issue) |
-| `GTS-E015` | Installation timed out (10 minute limit) |
-| `GTS-E020` | Self-update failed |
-| `GTS-E030` | Backup failed |
-| `GTS-E031` | Restore from backup failed |
-
-If you encounter an error, check the log file at `~/.config/gnome-theme-switcher/last_install.log` for details.
+MIT, see [LICENSE](LICENSE). no warranty, it changes your desktop settings, use at your own risk. not affiliated with gnome, zorin group, canonical, apple, microsoft or any of the theme authors, the names are just there to say what it works with and what things look like.
